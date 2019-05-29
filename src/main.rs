@@ -46,5 +46,5 @@ fn fmt_vulns(vulns: &[vulns::VulnInfo]) -> String {
 }
 
 fn fmt_vuln(vuln: &vulns::VulnInfo) -> String {
-    format!("{}: {} {} ({})", vuln.ecosystem, vuln.package, vuln.current_requirements, vuln.vulnerable_range)
+    format!("{}: {} {} ({}) {}", vuln.ecosystem, vuln.package, vuln.current_requirements, vuln.vulnerable_range, vuln.severity)
 }

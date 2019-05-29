@@ -22,6 +22,7 @@ pub struct VulnInfo {
     pub package: String,
     pub current_requirements: String,
     pub vulnerable_range: String,
+    pub severity: String,
 }
 
 #[derive(Debug, Clone)]
@@ -81,11 +82,13 @@ fn get_repo_vulns(vuln_alerts: &RVORNVA) -> Fallible<Vec<VulnInfo>> {
         let ecosystem = eco_to_string(&vuln.package.ecosystem)?;
         let package = vuln.package.name.clone();
         let vulnerable_range = vuln.vulnerable_version_range.clone();
+        let severity = sev_to_string(&vuln.severity)?;
         let vi = VulnInfo {
             ecosystem,
             package,
             current_requirements,
             vulnerable_range,
+            severity,
         };
         vis.push(vi);
     }
@@ -94,6 +97,10 @@ fn get_repo_vulns(vuln_alerts: &RVORNVA) -> Fallible<Vec<VulnInfo>> {
 
 fn eco_to_string(eco: &repo_vulns::SecurityAdvisoryEcosystem) -> Fallible<String> {
     Ok(serde_json::from_str(&serde_json::to_string(eco)?)?)
+}
+
+fn sev_to_string(sev: &repo_vulns::SecurityAdvisorySeverity) -> Fallible<String> {
+    Ok(serde_json::from_str(&serde_json::to_string(sev)?)?)
 }
 
 fn rv_query(org: &str, token: &str, cursor: Option<String>) -> Fallible<RVOR> {
