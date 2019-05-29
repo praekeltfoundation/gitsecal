@@ -1,0 +1,29 @@
+query RepoVulns($org: String!, $cursor: String) {
+  organization(login: $org) {
+    repositories(first: 100, after: $cursor) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        name
+        isArchived
+        # If there are more than 50 alerts, ignore the rest -- we have enough
+        # trouble already.
+        vulnerabilityAlerts(first: 50) {
+          nodes {
+            vulnerableRequirements
+            securityVulnerability {
+              severity
+              package {
+                ecosystem
+                name
+              }
+              vulnerableVersionRange
+            }
+          }
+        }
+      }
+    }
+  }
+}
