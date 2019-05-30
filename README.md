@@ -32,7 +32,22 @@ Once you have the schema json, you're ready to run `gitsecal`. During dev, it's
 easiest to do this with `cargo run`:
 
 ```
-cargo run -- --oauth-token <token> --org <org>
+$ cargo run -- --oauth-token <token> --org <org>
+
++--------------------------+----------+------------------------------------------------------+
+| repo                     | archived | vulns                                                |
++--------------------------+----------+------------------------------------------------------+
+| old-django-project       | false    | PIP: django >= 1.8,< 1.9 (>= 1.9, < 1.9.13) MODERATE |
+|                          |          | PIP: django >= 1.8,< 1.9 (>= 1.9, < 1.9.13) MODERATE |
+|                          |          | PIP: django >= 1.8,< 1.9 (< 1.11.18) LOW             |
+|                          |          | PIP: django >= 1.8,< 1.9 (< 1.11.19) MODERATE        |
++--------------------------+----------+------------------------------------------------------+
+| antique-js-thing         | false    | NPM: lodash ^ 3.6.0 (< 4.17.11) LOW                  |
++--------------------------+----------+------------------------------------------------------+
+| was-up-to-date-last-week | false    | PIP: django = 2.1.4 (>= 2.1.0, < 2.1.5) LOW          |
+|                          |          | PIP: django = 2.1.4 (>= 2.1.0, < 2.1.6) MODERATE     |
+|                          |          | PIP: djangorestframework = 3.9.0 (< 3.9.1) MODERATE  |
++--------------------------+----------+------------------------------------------------------+
 ```
 
 All options can also be provided in environment variables (`GH_OAUTH_TOKEN`,
