@@ -1,0 +1,34 @@
+query RepoCollabs($org: String!, $cursor: String) {
+  organization(login: $org) {
+    repositories(first: 10, after: $cursor) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        name
+        isArchived
+        # I hope we don't have any repos with more than 100 collaborators,
+        # because I have no idea how nested pagination would work.
+        collaborators(first: 100) {
+          edges {
+            node {
+              login
+            }
+            permission
+            permissionSources {
+              organization { login }
+              permission
+              source {
+                __typename
+                ... on Organization { login }
+                ... on Repository { name }
+                ... on Team { name }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

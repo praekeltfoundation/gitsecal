@@ -79,10 +79,10 @@ fn get_repo_vulns(vuln_alerts: &RVORNVA) -> Fallible<Vec<VulnInfo>> {
         let alert = node.as_ref().unwrap();
         let current_requirements = alert.vulnerable_requirements.as_ref().unwrap().clone();
         let vuln = alert.security_vulnerability.as_ref().unwrap();
-        let ecosystem = eco_to_string(&vuln.package.ecosystem)?;
+        let ecosystem = enum_to_string(&vuln.package.ecosystem)?;
         let package = vuln.package.name.clone();
         let vulnerable_range = vuln.vulnerable_version_range.clone();
-        let severity = sev_to_string(&vuln.severity)?;
+        let severity = enum_to_string(&vuln.severity)?;
         let vi = VulnInfo {
             ecosystem,
             package,
@@ -95,12 +95,8 @@ fn get_repo_vulns(vuln_alerts: &RVORNVA) -> Fallible<Vec<VulnInfo>> {
     Ok(vis)
 }
 
-fn eco_to_string(eco: &repo_vulns::SecurityAdvisoryEcosystem) -> Fallible<String> {
-    Ok(serde_json::from_str(&serde_json::to_string(eco)?)?)
-}
-
-fn sev_to_string(sev: &repo_vulns::SecurityAdvisorySeverity) -> Fallible<String> {
-    Ok(serde_json::from_str(&serde_json::to_string(sev)?)?)
+fn enum_to_string<T: serde::Serialize>(x: &T) -> Fallible<String> {
+    Ok(serde_json::from_str(&serde_json::to_string(x)?)?)
 }
 
 fn rv_query(org: &str, token: &str, cursor: Option<String>) -> Fallible<RVOR> {
