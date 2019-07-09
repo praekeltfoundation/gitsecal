@@ -1,7 +1,8 @@
 use failure::{format_err, Fallible};
-
 use graphql_client::GraphQLQuery;
+use prettytable::{cell, row, Row};
 
+use crate::common::RowItem;
 use crate::gql_utils::Querier;
 
 #[derive(GraphQLQuery)]
@@ -80,6 +81,26 @@ impl CollabRepo {
         self.collabs.iter().filter(|c| c.is_admin()).collect()
     }
 }
+
+impl RowItem for CollabRepo {
+    type CmpKey = String;
+    type DisplayOpts = ();
+
+    fn cmp_key(&self) -> Self::CmpKey {
+        self.name.clone()
+    }
+
+    fn table_row(&self, _opts: &Self::DisplayOpts) -> Row {
+        let mut admins = vec![];
+        for admin in self.admins() {
+            if admin.is_explicit_admin() {
+                admins.push(admin.login.as_str());
+            }
+        }
+        row![self.name, admins.join("\n")]
+    }
+}
+
 
 pub fn repo_collabs(org: &str, token: &str) -> Fallible<Vec<CollabRepo>> {
     let querier = Querier::new(token)

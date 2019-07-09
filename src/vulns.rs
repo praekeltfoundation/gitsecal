@@ -1,7 +1,8 @@
 use failure::{format_err, Fallible};
-
 use graphql_client::GraphQLQuery;
+use prettytable::{cell, row, Row};
 
+use crate::common::RowItem;
 use crate::gql_utils::Querier;
 
 #[derive(GraphQLQuery)]
@@ -36,6 +37,31 @@ pub struct VulnRepo {
     pub is_archived: bool,
     pub vulns: Vec<VulnInfo>,
 }
+
+
+impl RowItem for VulnRepo {
+    type CmpKey = String;
+    type DisplayOpts = ();
+
+    fn cmp_key(&self) -> Self::CmpKey {
+        self.name.clone()
+    }
+
+    fn table_row(&self, _opts: &Self::DisplayOpts) -> Row {
+        let mut vulns = vec![];
+        for vuln in &self.vulns {
+            vulns.push(format!("{}: {} {} ({}) {}",
+                               vuln.ecosystem,
+                               vuln.package,
+                               vuln.current_requirements,
+                               vuln.vulnerable_range,
+                               vuln.severity,
+            ));
+        }
+        row![self.name, self.is_archived, vulns.join("\n")]
+    }
+}
+
 
 pub fn repo_vulns(org: &str, token: &str) -> Fallible<Vec<VulnRepo>> {
     let querier = Querier::new(token)

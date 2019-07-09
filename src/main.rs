@@ -1,10 +1,12 @@
 use failure::Fallible;
-use prettytable::{cell, row};
+use prettytable::{cell, row, Row};
 use structopt::StructOpt;
 
+use common::RowItem;
 use collab::repo_collabs;
 use vulns::repo_vulns;
 
+mod common;
 mod gql_utils;
 mod collab;
 mod vulns;
@@ -43,54 +45,25 @@ fn main() -> Fallible<()> {
 }
 
 fn cmd_admins(cli: &Cli) -> Fallible<()> {
-    let mut table = prettytable::Table::new();
-
-    table.add_row(row!(b => "repo", "admins"));
-
-    for repo in repo_collabs(&cli.org, &cli.oauth_token)? {
-        if !repo.is_archived {
-            table.add_row(row![repo.name, fmt_admins(&repo)]);
-        }
-    }
-
-    table.printstd();
+    let mut repos = repo_collabs(&cli.org, &cli.oauth_token)?;
+    collab::CollabRepo::sort_vec(&mut repos);
+    display_table(row!(b => "repo", "admins"), &repos, &());
     Ok(())
-}
-
-fn fmt_admins(repo: &collab::CollabRepo) -> String {
-    let mut lines = vec![];
-    for collab in repo.admins() {
-        if collab.is_explicit_admin() {
-            lines.push(collab.login.to_owned());
-        }
-    }
-    lines.join("\n")
 }
 
 fn cmd_vulns(cli: &Cli) -> Fallible<()> {
-    let mut table = prettytable::Table::new();
-
-    table.add_row(row!(b => "repo", "archived", "vulns"));
-
-    for repo in repo_vulns(&cli.org, &cli.oauth_token)? {
-        if !repo.vulns.is_empty() {
-            // println!("{}: {}", repo.name, repo.vulns.len());
-            table.add_row(row![repo.name, repo.is_archived, fmt_vulns(&repo.vulns)]);
-        }
-    }
-
-    table.printstd();
+    let mut repos = repo_vulns(&cli.org, &cli.oauth_token)?;
+    vulns::VulnRepo::sort_vec(&mut repos);
+    display_table(row!(b => "repo", "archived", "vulns"), &repos, &());
     Ok(())
 }
 
-fn fmt_vulns(vulns: &[vulns::VulnInfo]) -> String {
-    let mut lines = vec![];
-    for vuln in vulns {
-        lines.push(fmt_vuln(vuln));
+fn display_table<T: RowItem>(header: Row, items: &[T], dopts: &T::DisplayOpts) {
+    let mut table = prettytable::Table::new();
+    table.add_row(header);
+    for item in items {
+        table.add_row(item.table_row(dopts));
     }
-    lines.join("\n")
-}
 
-fn fmt_vuln(vuln: &vulns::VulnInfo) -> String {
-    format!("{}: {} {} ({}) {}", vuln.ecosystem, vuln.package, vuln.current_requirements, vuln.vulnerable_range, vuln.severity)
+    table.printstd();
 }
