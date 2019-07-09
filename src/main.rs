@@ -5,6 +5,7 @@ use structopt::StructOpt;
 use collab::repo_collabs;
 use vulns::repo_vulns;
 
+mod gql_utils;
 mod collab;
 mod vulns;
 

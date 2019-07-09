@@ -1,6 +1,8 @@
 use failure::{format_err, Fallible};
 
-use graphql_client::{GraphQLQuery, Response};
+use graphql_client::GraphQLQuery;
+
+use crate::gql_utils::Querier;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -80,11 +82,16 @@ impl CollabRepo {
 }
 
 pub fn repo_collabs(org: &str, token: &str) -> Fallible<Vec<CollabRepo>> {
+    let querier = Querier::new(token)
+        .header("Accept", "application/vnd.github.vixen-preview+json")
+        .error_filter(&|e: &graphql_client::Error| {
+            e.message != "Must have push access to view repository collaborators."
+        });
     let mut repos = vec![];
 
     let mut cursor = None;
     loop {
-        let org_repos = rc_query(org, token, cursor)?;
+        let org_repos = rc_query(&querier, org, cursor)?;
         collect_repos(&mut repos, &org_repos)?;
         cursor = get_cursor(&org_repos);
         println!("Cursor: {:?}", cursor);
@@ -169,49 +176,14 @@ fn enum_to_string<T: serde::Serialize>(x: &T) -> Fallible<String> {
     Ok(serde_json::from_str(&serde_json::to_string(x)?)?)
 }
 
-fn rc_query(org: &str, token: &str, cursor: Option<String>) -> Fallible<RCOR> {
+fn rc_query(querier: &Querier, org: &str, cursor: Option<String>) -> Fallible<RCOR> {
     let q = RepoCollabs::build_query(repo_collabs::Variables {
         org: org.to_string(),
         cursor,
     });
 
-    let client = reqwest::Client::new();
-
-    let mut res = client
-        .post("https://api.github.com/graphql")
-        .header("Accept", "application/vnd.github.vixen-preview+json")
-        .bearer_auth(token)
-        .json(&q)
-        .send()?;
-
-
-    let response_body: Response<repo_collabs::ResponseData> = match res.json() {
-        Ok(json) => json,
-        Err(e) => {
-            println!("Bad response: {:?}\n{:?}", e, res.text());
-            return Err(e)?;
-        },
-    };
-
-    // println!("Response: {:?}", response_body);
-
-    if let Some(errors) = response_body.errors {
-        // Archived repos will throw this error, and there doesn't seem to be a
-        // way to filter them out of the query.
-        let filtered: Vec<_> = errors.iter().filter(|e| {
-            e.message != "Must have push access to view repository collaborators."
-        }).collect();
-        if !filtered.is_empty() {
-            println!("there are errors:");
-
-            for error in &filtered {
-                println!("{:?}", error);
-            }
-        }
-    }
-
-    let org_repos = response_body
-        .data.ok_or_else(|| format_err!("missing response data"))?
+    let rd: repo_collabs::ResponseData = querier.query(&q)?;
+    let org_repos = rd
         .organization.ok_or_else(|| format_err!("missing org in response data"))?
         .repositories;
     Ok(org_repos)

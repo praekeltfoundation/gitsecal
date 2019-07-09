@@ -1,6 +1,8 @@
 use failure::{format_err, Fallible};
 
-use graphql_client::{GraphQLQuery, Response};
+use graphql_client::GraphQLQuery;
+
+use crate::gql_utils::Querier;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -33,11 +35,13 @@ pub struct VulnRepo {
 }
 
 pub fn repo_vulns(org: &str, token: &str) -> Fallible<Vec<VulnRepo>> {
+    let querier = Querier::new(token)
+        .header("Accept", "application/vnd.github.vixen-preview+json");
     let mut repos = vec![];
 
     let mut cursor = None;
     loop {
-        let org_repos = rv_query(org, token, cursor)?;
+        let org_repos = rv_query(&querier, org, cursor)?;
         collect_repos(&mut repos, &org_repos)?;
         cursor = get_cursor(&org_repos);
         // println!("Cursor: {:?}", cursor);
@@ -97,35 +101,14 @@ fn enum_to_string<T: serde::Serialize>(x: &T) -> Fallible<String> {
     Ok(serde_json::from_str(&serde_json::to_string(x)?)?)
 }
 
-fn rv_query(org: &str, token: &str, cursor: Option<String>) -> Fallible<RVOR> {
+fn rv_query(querier: &Querier, org: &str, cursor: Option<String>) -> Fallible<RVOR> {
     let q = RepoVulns::build_query(repo_vulns::Variables {
         org: org.to_string(),
         cursor,
     });
 
-    let client = reqwest::Client::new();
-
-    let mut res = client
-        .post("https://api.github.com/graphql")
-        .header("Accept", "application/vnd.github.vixen-preview+json")
-        .bearer_auth(token)
-        .json(&q)
-        .send()?;
-
-    let response_body: Response<repo_vulns::ResponseData> = res.json()?;
-
-    // println!("Response: {:?}", response_body);
-
-    if let Some(errors) = response_body.errors {
-        println!("there are errors:");
-
-        for error in &errors {
-            println!("{:?}", error);
-        }
-    }
-
-    let org_repos = response_body
-        .data.ok_or_else(|| format_err!("missing response data"))?
+    let rd: repo_vulns::ResponseData = querier.query(&q)?;
+    let org_repos = rd
         .organization.ok_or_else(|| format_err!("missing org in response data"))?
         .repositories;
     Ok(org_repos)
