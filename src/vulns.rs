@@ -13,10 +13,13 @@ use crate::gql_utils::Querier;
 struct RepoVulns;
 
 
-type RVOR = repo_vulns::RepoVulnsOrganizationRepositories;
-type RVORN = repo_vulns::RepoVulnsOrganizationRepositoriesNodes;
-type RVORNVA = repo_vulns::RepoVulnsOrganizationRepositoriesNodesVulnerabilityAlerts;
-type RVORNVAN = repo_vulns::RepoVulnsOrganizationRepositoriesNodesVulnerabilityAlertsNodes;
+use repo_vulns::{
+    RepoVulnsOrganizationRepositories as RVOR,
+    RepoVulnsOrganizationRepositoriesNodes as RVORN,
+    RepoVulnsOrganizationRepositoriesNodesVulnerabilityAlerts as RVORNVA,
+    RepoVulnsOrganizationRepositoriesNodesVulnerabilityAlertsNodes as RVORNVAN,
+};
+
 
 #[derive(Debug, Clone)]
 pub struct VulnInfo {
