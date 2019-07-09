@@ -107,16 +107,14 @@ fn collect_repos(repos: &mut Vec<CollabRepo>, org_repos: &RCOR) -> Fallible<()> 
     for node in nodes.unwrap_or(&Vec::<Option<RCORN>>::new()) {
         let repo = node.as_ref().unwrap();
         // println!("{:?}:", &repo.name);
-        let name = repo.name.clone();
-        let is_archived = repo.is_archived.clone();
         let collabs = if let Some(cs) = &repo.collaborators {
             get_repo_collabs(cs)?
         } else {
             vec![]
         };
         let vr = CollabRepo {
-            name,
-            is_archived,
+            name: repo.name.clone(),
+            is_archived: repo.is_archived,
             collabs,
         };
         repos.push(vr);
@@ -147,7 +145,7 @@ fn get_repo_collabs(collabs: &RCORNC) -> Fallible<Vec<CollabInfo>> {
     Ok(cis)
 }
 
-fn get_perm_sources(perm_sources: &Vec<RCORNCEPS>) -> Fallible<Vec<PermSource>> {
+fn get_perm_sources(perm_sources: &[RCORNCEPS]) -> Fallible<Vec<PermSource>> {
     let mut pss = vec![];
     for perm_source in perm_sources {
         // println!("  {:#?}", perm_source);
@@ -174,7 +172,7 @@ fn enum_to_string<T: serde::Serialize>(x: &T) -> Fallible<String> {
 fn rc_query(org: &str, token: &str, cursor: Option<String>) -> Fallible<RCOR> {
     let q = RepoCollabs::build_query(repo_collabs::Variables {
         org: org.to_string(),
-        cursor: cursor,
+        cursor,
     });
 
     let client = reqwest::Client::new();
@@ -213,8 +211,8 @@ fn rc_query(org: &str, token: &str, cursor: Option<String>) -> Fallible<RCOR> {
     }
 
     let org_repos = response_body
-        .data.ok_or(format_err!("missing response data"))?
-        .organization.ok_or(format_err!("missing org in response data"))?
+        .data.ok_or_else(|| format_err!("missing response data"))?
+        .organization.ok_or_else(|| format_err!("missing org in response data"))?
         .repositories;
     Ok(org_repos)
 }

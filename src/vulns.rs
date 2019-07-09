@@ -59,12 +59,10 @@ fn collect_repos(repos: &mut Vec<VulnRepo>, org_repos: &RVOR) -> Fallible<()> {
     let nodes = org_repos.nodes.as_ref();
     for node in nodes.unwrap_or(&Vec::<Option<RVORN>>::new()) {
         let repo = node.as_ref().unwrap();
-        let name = repo.name.clone();
-        let is_archived = repo.is_archived.clone();
         let vulns = get_repo_vulns(repo.vulnerability_alerts.as_ref().unwrap())?;
         let vr = VulnRepo {
-            name,
-            is_archived,
+            name: repo.name.clone(),
+            is_archived: repo.is_archived,
             vulns,
         };
         repos.push(vr);
@@ -102,7 +100,7 @@ fn enum_to_string<T: serde::Serialize>(x: &T) -> Fallible<String> {
 fn rv_query(org: &str, token: &str, cursor: Option<String>) -> Fallible<RVOR> {
     let q = RepoVulns::build_query(repo_vulns::Variables {
         org: org.to_string(),
-        cursor: cursor,
+        cursor,
     });
 
     let client = reqwest::Client::new();
@@ -127,8 +125,8 @@ fn rv_query(org: &str, token: &str, cursor: Option<String>) -> Fallible<RVOR> {
     }
 
     let org_repos = response_body
-        .data.ok_or(format_err!("missing response data"))?
-        .organization.ok_or(format_err!("missing org in response data"))?
+        .data.ok_or_else(|| format_err!("missing response data"))?
+        .organization.ok_or_else(|| format_err!("missing org in response data"))?
         .repositories;
     Ok(org_repos)
 }
