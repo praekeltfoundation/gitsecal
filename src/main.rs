@@ -1,8 +1,8 @@
-use failure::Fallible;
+use failure::{format_err, Fallible};
 use prettytable::{cell, row, Row};
 use structopt::StructOpt;
 
-use common::RowItem;
+use common::{CommonOpts, DisplayOpts, RowItem};
 use collab::repo_collabs;
 use vulns::repo_vulns;
 
@@ -23,9 +23,47 @@ struct Cli {
     #[structopt(long, env = "GH_ORG")]
     org: String,
 
+    /// Output format, one of {table, oneline}
+    #[structopt(long, env = "OUTPUT_FORMAT", default_value = "table")]
+    output_format: OutputFormat,
+
     /// Command to run
     #[structopt(subcommand)]
     cmd: Option<Command>,
+}
+
+#[derive(Clone, Copy, Debug, StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+enum OutputFormat {
+    Table,
+    Oneline,
+}
+
+impl OutputFormat {
+    fn common_opts(&self) -> CommonOpts {
+        match self {
+            OutputFormat::Table => CommonOpts {
+                multiline: true,
+                borders: true,
+            },
+            OutputFormat::Oneline => CommonOpts {
+                multiline: false,
+                borders: false,
+            }
+        }
+    }
+}
+
+impl std::str::FromStr for OutputFormat {
+    type Err = failure::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "table" => Ok(OutputFormat::Table),
+            "oneline" => Ok(OutputFormat::Oneline),
+            _ => Err(format_err!("Unknown format: {}", s)),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, StructOpt)]
@@ -47,22 +85,30 @@ fn main() -> Fallible<()> {
 fn cmd_admins(cli: &Cli) -> Fallible<()> {
     let mut repos = repo_collabs(&cli.org, &cli.oauth_token)?;
     collab::CollabRepo::sort_vec(&mut repos);
-    display_table(row!(b => "repo", "admins"), &repos, &());
+    let dopts = collab::CRDisplayOpts::new(cli.output_format.common_opts());
+    display_table(row!(b => "repo", "admins"), &repos, &dopts);
     Ok(())
 }
 
 fn cmd_vulns(cli: &Cli) -> Fallible<()> {
     let mut repos = repo_vulns(&cli.org, &cli.oauth_token)?;
     vulns::VulnRepo::sort_vec(&mut repos);
-    display_table(row!(b => "repo", "archived", "vulns"), &repos, &());
+    let dopts = vulns::VRDisplayOpts::new(cli.output_format.common_opts());
+    display_table(row!(b => "repo", "archived", "vulns"), &repos, &dopts);
     Ok(())
 }
+
+
 
 fn display_table<T: RowItem>(header: Row, items: &[T], dopts: &T::DisplayOpts) {
     let mut table = prettytable::Table::new();
     table.add_row(header);
     for item in items {
         table.add_row(item.table_row(dopts));
+    }
+
+    if !dopts.common_opts().borders {
+        table.set_format(*prettytable::format::consts::FORMAT_CLEAN);
     }
 
     table.printstd();

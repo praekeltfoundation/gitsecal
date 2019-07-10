@@ -2,7 +2,7 @@ use failure::{format_err, Fallible};
 use graphql_client::GraphQLQuery;
 use prettytable::{cell, row, Row};
 
-use crate::common::RowItem;
+use crate::common::{CommonOpts, DisplayOpts, RowItem};
 use crate::gql_utils::Querier;
 
 #[derive(GraphQLQuery)]
@@ -82,22 +82,39 @@ impl CollabRepo {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct CRDisplayOpts {
+    common: CommonOpts,
+}
+
+impl CRDisplayOpts {
+    pub fn new(common: CommonOpts) -> Self {
+        Self { common }
+    }
+}
+
+impl DisplayOpts for CRDisplayOpts {
+    fn common_opts(&self) -> CommonOpts {
+        self.common
+    }
+}
+
 impl RowItem for CollabRepo {
     type CmpKey = String;
-    type DisplayOpts = ();
+    type DisplayOpts = CRDisplayOpts;
 
     fn cmp_key(&self) -> Self::CmpKey {
         self.name.clone()
     }
 
-    fn table_row(&self, _opts: &Self::DisplayOpts) -> Row {
+    fn table_row(&self, opts: &Self::DisplayOpts) -> Row {
         let mut admins = vec![];
         for admin in self.admins() {
             if admin.is_explicit_admin() {
-                admins.push(admin.login.as_str());
+                admins.push(admin.login.clone());
             }
         }
-        row![self.name, admins.join("\n")]
+        row![self.name, opts.joinstrs(&admins)]
     }
 }
 

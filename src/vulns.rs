@@ -2,7 +2,7 @@ use failure::{format_err, Fallible};
 use graphql_client::GraphQLQuery;
 use prettytable::{cell, row, Row};
 
-use crate::common::RowItem;
+use crate::common::{CommonOpts, DisplayOpts, RowItem};
 use crate::gql_utils::Querier;
 
 #[derive(GraphQLQuery)]
@@ -38,16 +38,32 @@ pub struct VulnRepo {
     pub vulns: Vec<VulnInfo>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct VRDisplayOpts {
+    common: CommonOpts,
+}
+
+impl VRDisplayOpts {
+    pub fn new(common: CommonOpts) -> Self {
+        Self { common }
+    }
+}
+
+impl DisplayOpts for VRDisplayOpts {
+    fn common_opts(&self) -> CommonOpts {
+        self.common
+    }
+}
 
 impl RowItem for VulnRepo {
     type CmpKey = String;
-    type DisplayOpts = ();
+    type DisplayOpts = VRDisplayOpts;
 
     fn cmp_key(&self) -> Self::CmpKey {
         self.name.clone()
     }
 
-    fn table_row(&self, _opts: &Self::DisplayOpts) -> Row {
+    fn table_row(&self, dopts: &Self::DisplayOpts) -> Row {
         let mut vulns = vec![];
         for vuln in &self.vulns {
             vulns.push(format!("{}: {} {} ({}) {}",
@@ -58,7 +74,7 @@ impl RowItem for VulnRepo {
                                vuln.severity,
             ));
         }
-        row![self.name, self.is_archived, vulns.join("\n")]
+        row![self.name, self.is_archived, dopts.joinstrs(&vulns)]
     }
 }
 
