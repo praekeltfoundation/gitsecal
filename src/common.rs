@@ -23,4 +23,5 @@ pub trait DisplayOpts {
 pub struct CommonOpts {
     pub multiline: bool,
     pub borders: bool,
+    pub csv: bool,
 }

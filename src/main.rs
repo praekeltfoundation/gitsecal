@@ -23,7 +23,7 @@ struct Cli {
     #[structopt(long, env = "GH_ORG")]
     org: String,
 
-    /// Output format, one of {table, oneline}
+    /// Output format, one of {table, oneline, csv}
     #[structopt(long, env = "OUTPUT_FORMAT", default_value = "table")]
     output_format: OutputFormat,
 
@@ -37,6 +37,7 @@ struct Cli {
 enum OutputFormat {
     Table,
     Oneline,
+    Csv,
 }
 
 impl OutputFormat {
@@ -45,11 +46,18 @@ impl OutputFormat {
             OutputFormat::Table => CommonOpts {
                 multiline: true,
                 borders: true,
+                csv: false,
             },
             OutputFormat::Oneline => CommonOpts {
                 multiline: false,
                 borders: false,
-            }
+                csv: false,
+            },
+            OutputFormat::Csv => CommonOpts {
+                multiline: false,
+                borders: false,
+                csv: true,
+            },
         }
     }
 }
@@ -61,6 +69,7 @@ impl std::str::FromStr for OutputFormat {
         match s {
             "table" => Ok(OutputFormat::Table),
             "oneline" => Ok(OutputFormat::Oneline),
+            "csv" => Ok(OutputFormat::Csv),
             _ => Err(format_err!("Unknown format: {}", s)),
         }
     }
@@ -86,21 +95,18 @@ fn cmd_admins(cli: &Cli) -> Fallible<()> {
     let mut repos = repo_collabs(&cli.org, &cli.oauth_token)?;
     collab::CollabRepo::sort_vec(&mut repos);
     let dopts = collab::CRDisplayOpts::new(cli.output_format.common_opts());
-    display_table(row!(b => "repo", "admins"), &repos, &dopts);
-    Ok(())
+    display_table(row!(b => "repo", "admins"), &repos, &dopts)
 }
 
 fn cmd_vulns(cli: &Cli) -> Fallible<()> {
     let mut repos = repo_vulns(&cli.org, &cli.oauth_token)?;
     vulns::VulnRepo::sort_vec(&mut repos);
     let dopts = vulns::VRDisplayOpts::new(cli.output_format.common_opts());
-    display_table(row!(b => "repo", "archived", "vulns"), &repos, &dopts);
-    Ok(())
+    display_table(row!(b => "repo", "archived", "vulns"), &repos, &dopts)
 }
 
 
-
-fn display_table<T: RowItem>(header: Row, items: &[T], dopts: &T::DisplayOpts) {
+fn display_table<T: RowItem>(header: Row, items: &[T], dopts: &T::DisplayOpts) -> Fallible<()> {
     let mut table = prettytable::Table::new();
     table.add_row(header);
     for item in items {
@@ -111,5 +117,10 @@ fn display_table<T: RowItem>(header: Row, items: &[T], dopts: &T::DisplayOpts) {
         table.set_format(*prettytable::format::consts::FORMAT_CLEAN);
     }
 
-    table.printstd();
+    if dopts.common_opts().csv {
+        table.to_csv(std::io::stdout())?;
+    } else {
+        table.printstd();
+    }
+    Ok(())
 }
