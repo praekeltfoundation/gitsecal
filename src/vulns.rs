@@ -58,7 +58,7 @@ pub fn repo_vulns(org: &str, token: &str) -> Fallible<Content> {
 
     let mut eco_cols: Vec<String> = ecos.iter().cloned().collect();
     eco_cols.sort();
-    let mut columns = vec!["repo".to_owned(), "archived".to_owned()];
+    let mut columns = vec!["repo".to_owned()];
     columns.append(&mut eco_cols);
     Ok(Content { columns, rows })
 }
@@ -75,6 +75,7 @@ fn collect_repos(rows: &mut Vec<RowItem>, ecos: &mut HashSet<String>, org_repos:
     let nodes = org_repos.nodes.as_ref();
     for node in nodes.unwrap_or(&Vec::<Option<RVORN>>::new()) {
         let repo = node.as_ref().unwrap();
+        if repo.is_archived { continue }
         let vulns = get_repo_vulns(repo.vulnerability_alerts.as_ref().unwrap())?;
         let vr = VulnRepo {
             name: repo.name.clone(),
@@ -99,7 +100,6 @@ fn add_row(rows: &mut Vec<RowItem>, ecos: &mut HashSet<String>, vr: VulnRepo) ->
         ecos.insert(vuln.ecosystem);
     }
     row.add_line("repo", vr.name);
-    row.add_line("archived", vr.is_archived);
     rows.push(row);
     Ok(())
 }
