@@ -1,8 +1,7 @@
 use failure::{format_err, Fallible};
 use graphql_client::GraphQLQuery;
-use prettytable::{cell, row, Row};
 
-use crate::common::{CommonOpts, DisplayOpts, RowItem};
+use crate::common::{Content, RowItem};
 use crate::gql_utils::Querier;
 
 #[derive(GraphQLQuery)]
@@ -82,61 +81,39 @@ impl CollabRepo {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct CRDisplayOpts {
-    common: CommonOpts,
-}
-
-impl CRDisplayOpts {
-    pub fn new(common: CommonOpts) -> Self {
-        Self { common }
-    }
-}
-
-impl DisplayOpts for CRDisplayOpts {
-    fn common_opts(&self) -> CommonOpts {
-        self.common
-    }
-}
-
-impl RowItem for CollabRepo {
-    type CmpKey = String;
-    type DisplayOpts = CRDisplayOpts;
-
-    fn cmp_key(&self) -> Self::CmpKey {
-        self.name.clone()
-    }
-
-    fn table_row(&self, opts: &Self::DisplayOpts) -> Row {
-        let mut admins = vec![];
-        for admin in self.admins() {
-            if admin.is_explicit_admin() {
-                admins.push(admin.login.clone());
-            }
+fn add_row(rows: &mut Vec<RowItem>, cr: CollabRepo) {
+    let mut row = RowItem::default();
+    let mut admins = vec![];
+    for admin in cr.admins() {
+        if admin.is_explicit_admin() {
+            admins.push(admin.login.clone());
         }
-        row![self.name, opts.joinstrs(&admins)]
     }
+    row.add_line("repo", cr.name);
+    row.add_lines("admins", admins);
+    rows.push(row);
 }
 
 
-pub fn repo_collabs(org: &str, token: &str) -> Fallible<Vec<CollabRepo>> {
+pub fn repo_collabs(org: &str, token: &str) -> Fallible<Content> {
     let querier = Querier::new(token)
         .header("Accept", "application/vnd.github.vixen-preview+json")
         .error_filter(&|e: &graphql_client::Error| {
             e.message != "Must have push access to view repository collaborators."
         });
-    let mut repos = vec![];
+    let mut rows = vec![];
 
     let mut cursor = None;
     loop {
         let org_repos = rc_query(&querier, org, cursor)?;
-        collect_repos(&mut repos, &org_repos)?;
+        collect_repos(&mut rows, &org_repos)?;
         cursor = get_cursor(&org_repos);
         println!("Cursor: {:?}", cursor);
         if cursor.is_none() { break }
     }
 
-    Ok(repos)
+    let columns = vec!["repo".to_owned(), "admins".to_owned()];
+    Ok(Content { columns, rows })
 }
 
 fn get_cursor(org_repos: &RCOR) -> Option<String> {
@@ -147,7 +124,7 @@ fn get_cursor(org_repos: &RCOR) -> Option<String> {
     }
 }
 
-fn collect_repos(repos: &mut Vec<CollabRepo>, org_repos: &RCOR) -> Fallible<()> {
+fn collect_repos(rows: &mut Vec<RowItem>, org_repos: &RCOR) -> Fallible<()> {
     let nodes = org_repos.nodes.as_ref();
     for node in nodes.unwrap_or(&Vec::<Option<RCORN>>::new()) {
         let repo = node.as_ref().unwrap();
@@ -157,12 +134,12 @@ fn collect_repos(repos: &mut Vec<CollabRepo>, org_repos: &RCOR) -> Fallible<()> 
         } else {
             vec![]
         };
-        let vr = CollabRepo {
+        let cr = CollabRepo {
             name: repo.name.clone(),
             is_archived: repo.is_archived,
             collabs,
         };
-        repos.push(vr);
+        add_row(rows, cr);
     }
     Ok(())
 }

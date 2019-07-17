@@ -1,27 +1,52 @@
-pub trait RowItem {
-    type CmpKey: Ord;
-    type DisplayOpts: DisplayOpts;
+use std::collections::HashMap;
 
-    fn cmp_key(&self) -> Self::CmpKey;
+#[derive(Debug, Clone)]
+pub enum CellItem {
+    Line(String),
+    Lines(Vec<String>),
+}
 
-    fn table_row(&self, opts: &Self::DisplayOpts) -> prettytable::Row;
 
-    fn sort_vec<T: RowItem>(row_items: &mut Vec<T>) {
-        row_items.sort_by(|a, b| a.cmp_key().cmp(&b.cmp_key()))
+impl CellItem {
+    pub fn text(&self, multiline: bool) -> String {
+        let joinstr = if multiline { "\n" } else { ", " };
+        match self {
+            CellItem::Line(line) => line.clone(),
+            CellItem::Lines(lines) => lines.join(joinstr),
+        }
     }
 }
 
-pub trait DisplayOpts {
-    fn common_opts(&self) -> CommonOpts;
 
-    fn joinstrs(&self, lines: &[String]) -> String {
-        lines.join(if self.common_opts().multiline { "\n" } else { ", " })
+#[derive(Debug, Default, Clone)]
+pub struct RowItem {
+    pub cells: HashMap<String, CellItem>,
+}
+
+
+impl RowItem {
+    pub fn add_line(&mut self, field: impl ToString, line: impl ToString) {
+        self.cells.insert(field.to_string(), CellItem::Line(line.to_string()));
+    }
+
+    pub fn add_lines(&mut self, field: impl ToString, lines: Vec<impl ToString>) {
+        let lines = lines.iter().map(|l| l.to_string()).collect();
+        self.cells.insert(field.to_string(), CellItem::Lines(lines));
+    }
+
+    pub fn append_line(&mut self, field: impl ToString, line: impl ToString) {
+        // FIXME: This should probably explode or error if we have a
+        // CellItem::Line instead.
+        let cell = self.cells.entry(field.to_string()).or_insert(CellItem::Lines(vec![]));
+        if let CellItem::Lines(lines) = cell {
+            lines.push(line.to_string());
+        }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct CommonOpts {
-    pub multiline: bool,
-    pub borders: bool,
-    pub csv: bool,
+
+#[derive(Debug, Default, Clone)]
+pub struct Content {
+    pub columns: Vec<String>,
+    pub rows: Vec<RowItem>,
 }

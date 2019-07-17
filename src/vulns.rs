@@ -1,8 +1,9 @@
+use std::collections::HashSet;
+
 use failure::{format_err, Fallible};
 use graphql_client::GraphQLQuery;
-use prettytable::{cell, row, Row};
 
-use crate::common::{CommonOpts, DisplayOpts, RowItem};
+use crate::common::{Content, RowItem};
 use crate::gql_utils::Querier;
 
 #[derive(GraphQLQuery)]
@@ -38,62 +39,50 @@ pub struct VulnRepo {
     pub vulns: Vec<VulnInfo>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct VRDisplayOpts {
-    common: CommonOpts,
+
+fn add_vuln(row: &mut RowItem, ecos: &mut HashSet<String>, vuln: VulnInfo) {
+    let vuln_line = format!("{} {} ({}) {}",
+                            vuln.package,
+                            vuln.current_requirements,
+                            vuln.vulnerable_range,
+                            vuln.severity,
+    );
+    row.append_line(&vuln.ecosystem, vuln_line);
+    ecos.insert(vuln.ecosystem);
 }
 
-impl VRDisplayOpts {
-    pub fn new(common: CommonOpts) -> Self {
-        Self { common }
+fn add_row(rows: &mut Vec<RowItem>, ecos: &mut HashSet<String>, vr: VulnRepo) {
+    let mut row = RowItem::default();
+    for vuln in vr.vulns {
+        add_vuln(&mut row, ecos, vuln);
     }
-}
-
-impl DisplayOpts for VRDisplayOpts {
-    fn common_opts(&self) -> CommonOpts {
-        self.common
-    }
-}
-
-impl RowItem for VulnRepo {
-    type CmpKey = String;
-    type DisplayOpts = VRDisplayOpts;
-
-    fn cmp_key(&self) -> Self::CmpKey {
-        self.name.clone()
-    }
-
-    fn table_row(&self, dopts: &Self::DisplayOpts) -> Row {
-        let mut vulns = vec![];
-        for vuln in &self.vulns {
-            vulns.push(format!("{}: {} {} ({}) {}",
-                               vuln.ecosystem,
-                               vuln.package,
-                               vuln.current_requirements,
-                               vuln.vulnerable_range,
-                               vuln.severity,
-            ));
-        }
-        row![self.name, self.is_archived, dopts.joinstrs(&vulns)]
-    }
+    row.add_line("repo", vr.name);
+    row.add_line("archived", vr.is_archived);
+    rows.push(row);
 }
 
 
-pub fn repo_vulns(org: &str, token: &str) -> Fallible<Vec<VulnRepo>> {
+pub fn repo_vulns(org: &str, token: &str) -> Fallible<Content> {
     let querier = Querier::new(token)
         .header("Accept", "application/vnd.github.vixen-preview+json");
-    let mut repos = vec![];
+
+    let mut rows = vec![];
+    let mut ecos = HashSet::new();
 
     let mut cursor = None;
     loop {
         let org_repos = rv_query(&querier, org, cursor)?;
-        collect_repos(&mut repos, &org_repos)?;
+        collect_repos(&mut rows, &mut ecos, &org_repos)?;
         cursor = get_cursor(&org_repos);
         // println!("Cursor: {:?}", cursor);
         if cursor.is_none() { break }
     }
 
-    Ok(repos)
+    let mut eco_cols: Vec<String> = ecos.iter().cloned().collect();
+    eco_cols.sort();
+    let mut columns = vec!["repo".to_owned(), "archived".to_owned()];
+    columns.append(&mut eco_cols);
+    Ok(Content { columns, rows })
 }
 
 fn get_cursor(org_repos: &RVOR) -> Option<String> {
@@ -104,7 +93,7 @@ fn get_cursor(org_repos: &RVOR) -> Option<String> {
     }
 }
 
-fn collect_repos(repos: &mut Vec<VulnRepo>, org_repos: &RVOR) -> Fallible<()> {
+fn collect_repos(rows: &mut Vec<RowItem>, ecos: &mut HashSet<String>, org_repos: &RVOR) -> Fallible<()> {
     let nodes = org_repos.nodes.as_ref();
     for node in nodes.unwrap_or(&Vec::<Option<RVORN>>::new()) {
         let repo = node.as_ref().unwrap();
@@ -114,7 +103,7 @@ fn collect_repos(repos: &mut Vec<VulnRepo>, org_repos: &RVOR) -> Fallible<()> {
             is_archived: repo.is_archived,
             vulns,
         };
-        repos.push(vr);
+        add_row(rows, ecos, vr);
     }
     Ok(())
 }

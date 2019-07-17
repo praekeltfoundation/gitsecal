@@ -1,12 +1,12 @@
 use failure::{format_err, Fallible};
-use prettytable::{Row, cell, row};
 use structopt::StructOpt;
 
-use common::{CommonOpts, DisplayOpts, RowItem};
+use display::{CommonOpts, printstd};
 use collab::repo_collabs;
 use vulns::repo_vulns;
 
 mod common;
+mod display;
 mod gql_utils;
 mod collab;
 mod vulns;
@@ -28,7 +28,7 @@ struct Cli {
     output_format: OutputFormat,
 
     /// Compress each output row to a single line
-    #[structopt(long, env = "OUTPUT_ONELINE")]
+    #[structopt(long)]
     output_oneline: bool,
 
     /// Command to run
@@ -96,34 +96,13 @@ fn main() -> Fallible<()> {
 }
 
 fn cmd_admins(cli: &Cli) -> Fallible<()> {
-    let mut repos = repo_collabs(&cli.org, &cli.oauth_token)?;
-    collab::CollabRepo::sort_vec(&mut repos);
-    let dopts = collab::CRDisplayOpts::new(cli.common_opts());
-    display_table(row!(b => "repo", "admins"), &repos, &dopts)
+    let mut content = repo_collabs(&cli.org, &cli.oauth_token)?;
+    // collab::CollabRepo::sort_vec(&mut repos);
+    printstd(content, cli.common_opts())
 }
 
 fn cmd_vulns(cli: &Cli) -> Fallible<()> {
-    let mut repos = repo_vulns(&cli.org, &cli.oauth_token)?;
-    vulns::VulnRepo::sort_vec(&mut repos);
-    let dopts = vulns::VRDisplayOpts::new(cli.common_opts());
-    display_table(row!(b => "repo", "archived", "vulns"), &repos, &dopts)
-}
-
-fn display_table<T: RowItem>(header: Row, items: &[T], dopts: &T::DisplayOpts) -> Fallible<()> {
-    let mut table = prettytable::Table::new();
-    table.add_row(header);
-    for item in items {
-        table.add_row(item.table_row(dopts));
-    }
-
-    if !dopts.common_opts().borders {
-        table.set_format(*prettytable::format::consts::FORMAT_CLEAN);
-    }
-
-    if dopts.common_opts().csv {
-        table.to_csv(std::io::stdout())?;
-    } else {
-        table.printstd();
-    }
-    Ok(())
+    let mut content = repo_vulns(&cli.org, &cli.oauth_token)?;
+    // vulns::VulnRepo::sort_vec(&mut repos);
+    printstd(content, cli.common_opts())
 }
