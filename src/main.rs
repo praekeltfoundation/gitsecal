@@ -1,5 +1,5 @@
 use failure::{format_err, Fallible};
-use prettytable::{cell, row, Row};
+use prettytable::{Row, cell, row};
 use structopt::StructOpt;
 
 use common::{CommonOpts, DisplayOpts, RowItem};
@@ -23,9 +23,13 @@ struct Cli {
     #[structopt(long, env = "GH_ORG")]
     org: String,
 
-    /// Output format, one of {table, oneline, csv}
+    /// Output format, one of {table, table-clean, csv}
     #[structopt(long, env = "OUTPUT_FORMAT", default_value = "table")]
     output_format: OutputFormat,
+
+    /// Compress each output row to a single line
+    #[structopt(long, env = "OUTPUT_ONELINE")]
+    output_oneline: bool,
 
     /// Command to run
     #[structopt(subcommand)]
@@ -36,25 +40,25 @@ struct Cli {
 #[structopt(rename_all = "kebab-case")]
 enum OutputFormat {
     Table,
-    Oneline,
+    TableClean,
     Csv,
 }
 
-impl OutputFormat {
+impl Cli {
     fn common_opts(&self) -> CommonOpts {
-        match self {
+        match self.output_format {
             OutputFormat::Table => CommonOpts {
-                multiline: true,
+                multiline: !self.output_oneline,
                 borders: true,
                 csv: false,
             },
-            OutputFormat::Oneline => CommonOpts {
-                multiline: false,
+            OutputFormat::TableClean => CommonOpts {
+                multiline: !self.output_oneline,
                 borders: false,
                 csv: false,
             },
             OutputFormat::Csv => CommonOpts {
-                multiline: false,
+                multiline: !self.output_oneline,
                 borders: false,
                 csv: true,
             },
@@ -68,7 +72,7 @@ impl std::str::FromStr for OutputFormat {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "table" => Ok(OutputFormat::Table),
-            "oneline" => Ok(OutputFormat::Oneline),
+            "table-clean" => Ok(OutputFormat::TableClean),
             "csv" => Ok(OutputFormat::Csv),
             _ => Err(format_err!("Unknown format: {}", s)),
         }
@@ -94,17 +98,16 @@ fn main() -> Fallible<()> {
 fn cmd_admins(cli: &Cli) -> Fallible<()> {
     let mut repos = repo_collabs(&cli.org, &cli.oauth_token)?;
     collab::CollabRepo::sort_vec(&mut repos);
-    let dopts = collab::CRDisplayOpts::new(cli.output_format.common_opts());
+    let dopts = collab::CRDisplayOpts::new(cli.common_opts());
     display_table(row!(b => "repo", "admins"), &repos, &dopts)
 }
 
 fn cmd_vulns(cli: &Cli) -> Fallible<()> {
     let mut repos = repo_vulns(&cli.org, &cli.oauth_token)?;
     vulns::VulnRepo::sort_vec(&mut repos);
-    let dopts = vulns::VRDisplayOpts::new(cli.output_format.common_opts());
+    let dopts = vulns::VRDisplayOpts::new(cli.common_opts());
     display_table(row!(b => "repo", "archived", "vulns"), &repos, &dopts)
 }
-
 
 fn display_table<T: RowItem>(header: Row, items: &[T], dopts: &T::DisplayOpts) -> Fallible<()> {
     let mut table = prettytable::Table::new();
