@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use failure::{format_err, Fallible};
+
 #[derive(Debug, Clone)]
 pub enum CellItem {
     Line(String),
@@ -34,12 +36,22 @@ impl RowItem {
         self.cells.insert(field.to_string(), CellItem::Lines(lines));
     }
 
-    pub fn append_line(&mut self, field: impl ToString, line: impl ToString) {
-        // FIXME: This should probably explode or error if we have a
-        // CellItem::Line instead.
-        let cell = self.cells.entry(field.to_string()).or_insert(CellItem::Lines(vec![]));
+    pub fn append_line(&mut self, field: impl ToString, line: impl ToString)  -> Fallible<()> {
+        let cell = self.cells.entry(field.to_string()).or_insert_with(|| CellItem::Lines(vec![]));
         if let CellItem::Lines(lines) = cell {
             lines.push(line.to_string());
+            Ok(())
+        } else {
+            Err(format_err!("can only append to a multiline cell"))
+        }
+    }
+
+    pub fn cmp_key(&self, field: &str) -> String {
+        let empty = "".to_owned();
+        match self.cells.get(field) {
+            None => empty,
+            Some(CellItem::Lines(lines)) => lines.first().cloned().unwrap_or(empty),
+            Some(CellItem::Line(line)) => line.clone(),
         }
     }
 }
@@ -49,4 +61,11 @@ impl RowItem {
 pub struct Content {
     pub columns: Vec<String>,
     pub rows: Vec<RowItem>,
+}
+
+
+impl Content {
+    pub fn sort_on(&mut self, field: &str) {
+        self.rows.sort_by_key(|row| row.cmp_key(field));
+    }
 }

@@ -97,12 +97,12 @@ fn main() -> Fallible<()> {
 
 fn cmd_admins(cli: &Cli) -> Fallible<()> {
     let mut content = repo_collabs(&cli.org, &cli.oauth_token)?;
-    // collab::CollabRepo::sort_vec(&mut repos);
+    content.sort_on("repo");
     printstd(content, cli.common_opts())
 }
 
 fn cmd_vulns(cli: &Cli) -> Fallible<()> {
     let mut content = repo_vulns(&cli.org, &cli.oauth_token)?;
-    // vulns::VulnRepo::sort_vec(&mut repos);
+    content.sort_on("repo");
     printstd(content, cli.common_opts())
 }

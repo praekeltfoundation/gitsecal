@@ -40,28 +40,6 @@ pub struct VulnRepo {
 }
 
 
-fn add_vuln(row: &mut RowItem, ecos: &mut HashSet<String>, vuln: VulnInfo) {
-    let vuln_line = format!("{} {} ({}) {}",
-                            vuln.package,
-                            vuln.current_requirements,
-                            vuln.vulnerable_range,
-                            vuln.severity,
-    );
-    row.append_line(&vuln.ecosystem, vuln_line);
-    ecos.insert(vuln.ecosystem);
-}
-
-fn add_row(rows: &mut Vec<RowItem>, ecos: &mut HashSet<String>, vr: VulnRepo) {
-    let mut row = RowItem::default();
-    for vuln in vr.vulns {
-        add_vuln(&mut row, ecos, vuln);
-    }
-    row.add_line("repo", vr.name);
-    row.add_line("archived", vr.is_archived);
-    rows.push(row);
-}
-
-
 pub fn repo_vulns(org: &str, token: &str) -> Fallible<Content> {
     let querier = Querier::new(token)
         .header("Accept", "application/vnd.github.vixen-preview+json");
@@ -103,8 +81,26 @@ fn collect_repos(rows: &mut Vec<RowItem>, ecos: &mut HashSet<String>, org_repos:
             is_archived: repo.is_archived,
             vulns,
         };
-        add_row(rows, ecos, vr);
+        add_row(rows, ecos, vr)?;
     }
+    Ok(())
+}
+
+fn add_row(rows: &mut Vec<RowItem>, ecos: &mut HashSet<String>, vr: VulnRepo) -> Fallible<()> {
+    let mut row = RowItem::default();
+    for vuln in vr.vulns {
+        let vuln_line = format!("{} {} ({}) {}",
+                                vuln.package,
+                                vuln.current_requirements,
+                                vuln.vulnerable_range,
+                                vuln.severity,
+        );
+        row.append_line(&vuln.ecosystem, vuln_line)?;
+        ecos.insert(vuln.ecosystem);
+    }
+    row.add_line("repo", vr.name);
+    row.add_line("archived", vr.is_archived);
+    rows.push(row);
     Ok(())
 }
 
